@@ -5,8 +5,11 @@
 #include <GL/gl.h> /* Include gl commands */
 #include <GL/glut.h> /* Include GLUT for context creation etc. */
 
+/* sec:global */
 /* Global storage*/
 unsigned int object_count = 0;
+
+float angle1, angle2, angle3;
 
 struct node;
 
@@ -14,13 +17,19 @@ node* camera;
 node* earth;
 node* sun;
 
+#define CENTER_LIST_SIZE 2
+unsigned int centerListSize = CENTER_LIST_SIZE;
+unsigned int selectedCenter = 0;
+node* centerList[sizeof(node*) * CENTER_LIST_SIZE];
+
+
 /*/////////////////////////////////////////////////////////////////////////////
-//
+// sec:scenegraph
 // Scene graph
 //
 /////////////////////////////////////////////////////////////////////////////*/
 
-#define GRAPH_NODE_MAX_CHILDREN
+#define GRAPH_NODE_MAX_CHILDREN 4
 
 struct node
 {
@@ -35,11 +44,17 @@ struct node
 node* make_node(void (*drawFunction)())
 {
     node* n = (node*) malloc(sizeof(node));
+    
+    for (int i = 0; i < GRAPH_NODE_MAX_CHILDREN; i++)
+    {
+	n->children[i] = 0;
+    }
 
     n->draw = drawFunction;
     
     n->object_no = object_count;
     object_count += 1;
+
     
     n->children_count = 0;
     n->parent = 0;
@@ -54,6 +69,32 @@ void add_child(node* parent, node* child)
 	parent->children[parent->children_count] = child;
 	parent->children_count += 1;
 	child->parent = parent;
+    }
+}
+
+void remove_child(node* parent, node* child)
+{
+    int i = 0;
+    int found = 0;
+    while(i < GRAPH_NODE_MAX_CHILDREN && found == 0)
+    {
+	if (parent->children[i] == child)
+	{
+	    found = 1;
+	    parent->children[i] = 0;
+	    parent->children_count -= 1;
+	    child->parent = 0;
+	} else
+	{
+	    i++;
+	}
+    }
+
+    /* Move any remaining children back one spot*/
+    while(i < (GRAPH_NODE_MAX_CHILDREN - 1))
+    {
+	parent->children[i] = parent->children[i+1];
+	i++;
     }
 }
 
@@ -98,7 +139,7 @@ f4x4 frame_to_canonical(node* n){
 
 
 /*/////////////////////////////////////////////////////////////////////////////
-//
+// sec:mygl
 // My GL functions
 //
 /////////////////////////////////////////////////////////////////////////////*/
@@ -115,7 +156,7 @@ void drawEarth()
     glutSolidSphere(0.2f, 16, 16);
 }
 
-void drawCamera()
+void drawNothing()
 {
 }
 
@@ -125,18 +166,22 @@ void movePlanets()
     f3 yAxis = f3_make(0.0f, 1.0f, 0.0f);
 
     /* Earth */
-    l = f4x4_rotate(0.33f./, yAxis);
+    l = f4x4_rotate(angle2, yAxis);
     l2 = f4x4_translate(-2.5f, 0.0f, 0.0f);
     earth->transform = f4x4_mul(l, l2);
 }
 
 void initSceneGraph()
 {
+    angle1 = 0.0f;
+    angle2 = 0.0f;
+    angle3 = 0.0f;
+    
     /* Initialize camera */
     camera = make_node(0);
-    f4x4 cam = f4x4_translate(0.0f, 0.0f, 5.0f);
-    f3 yAxis = f3_make(1.0f, 0.0f, 0.0f);
-    f4x4 rot = f4x4_rotate(-90, yAxis);
+    f4x4 cam = f4x4_translate(0.0f, 0.0f, 10.0f);
+    f3 xAxis = f3_make(1.0f, 0.0f, 0.0f);
+    f4x4 rot = f4x4_rotate(-90, xAxis);
     cam = f4x4_mul(rot, cam);
     camera->transform = cam;
 
@@ -147,6 +192,12 @@ void initSceneGraph()
     sun = make_node(drawSun);
     sun->transform = f4x4_id();
     add_child(sun, earth);
+    add_child(sun, camera);
+
+    centerList[0] = sun;
+    centerList[1] = earth;
+
+    movePlanets();
 }
 
 void glInit()
@@ -158,11 +209,12 @@ void glInit()
 void glCleanUp()
 {
     /* destroy the allocated nodes */
+    destroy_node_rec(sun);
 }
 
 
 /*/////////////////////////////////////////////////////////////////////////////
-//
+// sec:myglut
 // My GLUT functions
 //
 /////////////////////////////////////////////////////////////////////////////*/
@@ -187,6 +239,15 @@ void traverseGraph(node* n)
     glPopMatrix();
 }
 
+(* Changes on which object the camera is centered *)
+void changeCenter()
+{
+    remove_child(camera->parent, camera);
+    selectedCenter = (selectedCenter + 1) % centerListSize;
+    node* selectedNode = centerList[selectedCenter];
+    add_child(selectedNode, camera);
+}
+
 
 void keyboard(unsigned char key, int x, int y)
 {
@@ -195,6 +256,9 @@ void keyboard(unsigned char key, int x, int y)
     case 27:
 	glCleanUp();
 	exit(0);
+	break;
+    case 32:
+	changeCenter();
 	break;
     default:
 	break;
@@ -220,6 +284,11 @@ void display()
 
 void idle()
 {
+    /* Move angles a bit */
+    angle1 += 0.6;
+    angle2 += 0.8;
+    angle3 += 0.3;
+    
     /* Do stuff */
     movePlanets();
     
@@ -247,7 +316,7 @@ void resize(int w, int h) {
 
 
 /*/////////////////////////////////////////////////////////////////////////////
-//
+// sec:main
 // Main
 //
 /////////////////////////////////////////////////////////////////////////////*/

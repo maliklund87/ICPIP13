@@ -1,0 +1,26 @@
+
+* Your task is
+  Understand the example
+
+  - try changing the order of the transformations.
+  - try changing the scene graph, what happens if the earth orbits mars?
+  
+* Implement your own scene using the scenegraph
+  You are free to implement your own more complex scenegraph,
+  also in C++.
+
+
+* Implement reverse traversal
+  That is, extend the nodes with a parent and set the parent
+  when adding a child
+  Implement a function concatenating the transformations from
+  any node to the root, perhaps
+  f4x4 frame−to−canonical(node ∗n);
+  Make sure to compose transformations in correct order!
+  Use the node to root traversal to calculate Fcam
+  i.e. place a camera anywhere in the scene.
+
+* Share
+  Post a screenshots to the webforum.
+
+  Give feedback to fellow students in the webforum.
