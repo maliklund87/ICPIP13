@@ -7,5 +7,34 @@
 \author{Malik Lund}
 \title{ICGIP13 mandatory assignment}
 \begin{document}
-•
+
+%-----------------------------------------------------------------------
+%-- PART 1: COMPUTER GRAPHICS  -----------------------------------------
+%-----------------------------------------------------------------------
+\part{Computer graphics}
+The computer graphics part is written in C and compiles using make. Most of the code is contained in the file \texttt{assignment.c}, with the exception of the math library given for excercise 1.
+
+The code draws a square and a pyramid. The pyramid rotates around an invisible origin, as well as rotating around its centerpoint. The square rotates around the pyramid, always having the same face towards the pyramid. Pressing the space button will change the center of the camera, from either being centered on the square, the pyramid or the invisible origin.
+
+\section{Rendering using scenegraph traversal}
+
+The scenegraph is constructed in a very similar fashion to the scene graph given in excercise 2. Each node in the graph is a struct. This node contains a (single) transformation matrix (\texttt{transform}), a function pointer to a function that \emph{draws} that node (\texttt{draw}), an id (\texttt{object\_no}), an int containing the number of children (\texttt{children\_count}), an array with pointers to the child nodes (\texttt{children}) and finally a pointer to a parent (\texttt{parent}).
+
+The id is not used and is a remnant of the scene graph given in the excercise. Its use is replaced by a pointer to a function. I felt this made the \texttt{traverseGraph()}-function easier to read and easier to extend.
+
+Nodes are created with the \texttt{make\_node()} function which takes the address of a function as a parameter. Children are added to nodes with the \texttt{add\_child()} function and removed with the \texttt{remove\_child()} function. The two functions \texttt{destroy\_node()} and \texttt{destory\_node\_rec()} both delete a node (from memory), where the latter also deletes a nodes children.
+
+Objects are then rendered by traversing this scene graph, by calling the function \texttt{traverseGraph()} recursively. This function takes a \texttt{node} pointer as a parameter, and for each invocation of the function, the transformation matrix found in the node is pushed on the stack. Then the \texttt{draw()} function for the node is called, and the \texttt{traverseGraph()} function is called with each of the nodes children as the parameter. As the last step of the traversal the nodes transformation matrix is popped off the stack, leaving the stack as it was before the function was called.
+
+
+\section{Extracting transformations from scenegraphs}
+
+
+\section{Per-pixel lighting}
+
+%-----------------------------------------------------------------------
+%-- PART 2: IMAGE PROCESSING  ------------------------------------------
+%-----------------------------------------------------------------------
+\part{Image processing}
+
 \end{document}

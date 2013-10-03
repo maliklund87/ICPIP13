@@ -27,7 +27,7 @@ struct node;
 
 node* origin;
 node* camera;
-node* earth;
+node* square;
 node* pyramid;
 node* pyramid_p;
 
@@ -451,7 +451,7 @@ void drawPyramid(){
     glEnd();
 }
 
-void drawEarth()
+void drawSquare()
 {
     glColor3f(0.2f, 0.6f, 1.0f);
     glutSolidSphere(0.2f, 16, 16);
@@ -468,10 +468,10 @@ void movePlanets()
     f3 yAxis = f3_make(0.0f, 1.0f, 0.0f);
     f3 zAxis = f3_make(0.0f, 0.0f, 1.0f);
 
-    /* Earth */
+    /* Square */
     l = f4x4_rotate(angle2, yAxis);
     l2 = f4x4_translate(-2.5f, 0.0f, 0.0f);
-    earth->transform = f4x4_mul(l, l2);
+    square->transform = f4x4_mul(l, l2);
 
     /* Pyramid */
     f4x4 t1, t2, t3, t4;
@@ -482,7 +482,7 @@ void movePlanets()
     t4 = f4x4_mul(t3,t2);
     pyramid->transform = t4;
 
-    /* Sun position */
+    /* Pyramid position */
     l = f4x4_rotate(angle2, yAxis);
     l2 = f4x4_translate(1.0f, 0.0f, 0.0f);
     pyramid_p->transform = f4x4_mul(l, l2);
@@ -503,15 +503,15 @@ void initSceneGraph()
     cam = f4x4_mul(rot, cam);
     camera->transform = cam;
 
-    /* Earth */
-    earth = make_node(drawCube);
+    /* Square */
+    square = make_node(drawCube);
     
     /* Pyramid */
     pyramid = make_node(drawPyramid);
 
     /* Pyramid position */
     pyramid_p = make_node(0);
-    add_child(pyramid_p, earth);
+    add_child(pyramid_p, square);
     add_child(pyramid_p, camera);
     add_child(pyramid_p, pyramid);
 
@@ -521,7 +521,7 @@ void initSceneGraph()
 
     centerList[0] = origin;
     centerList[1] = pyramid_p;
-    centerList[2] = earth;
+    centerList[2] = square;
 
     movePlanets();
 }
@@ -563,7 +563,7 @@ void traverseGraph(node* n)
 
     if (n->draw != 0)
     {
-	(*n->draw)();
+	(*n->draw)(); // call function pointed to by draw
     }
 
     /* Render children recursively */
