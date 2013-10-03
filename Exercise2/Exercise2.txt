@@ -1,0 +1,39 @@
+
+
+*  Texturing
+
+   Look at the example in the Texture Folder.
+
+   Add textures and lights to objects created in the exercises.
+
+   To load textures the most simple way is to use "RAW" format.
+   
+
+** Converting to RAW
+   convert images using GIMP
+   or ImageMagicks  "convert"
+   $ convert input rgb:output.raw
+   you can add the "depth" and "size" options too
+
+
+* Shading
+  Look at the example in the phong folder.
+
+  Make sure you understand what is happening.
+
+  Change the shader such that the calculations are per-fragment and
+  not per vertex.
+
+** Hints and such
+
+   It is possible to reload the shader on runtime. This way you do not
+   have to restart or recompile you program every time you make a
+   small change in the shader.
+
+   You can press 'r' to reload. There is no error handling or
+   fallback, so if compilation fails you have to restart the program.
+
+   In the code there is specified a varying parameter, the normal. A
+   technique often used to debug shaders and graphics code is to write
+   the data the output. You can try to see what the varying normal vector
+   looks like interpreted as a color.

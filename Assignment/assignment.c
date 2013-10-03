@@ -8,19 +8,25 @@
 /* sec:global */
 /* Global storage*/
 unsigned int object_count = 0;
+int timestamp;
 
 float angle1, angle2, angle3;
 
 struct node;
 
+node* origin;
 node* camera;
 node* earth;
-node* sun;
+node* pyramid;
+node* pyramid_p;
 
-#define CENTER_LIST_SIZE 2
+#define CENTER_LIST_SIZE 3
 unsigned int centerListSize = CENTER_LIST_SIZE;
 unsigned int selectedCenter = 0;
 node* centerList[sizeof(node*) * CENTER_LIST_SIZE];
+
+GLuint spongebob;
+GLuint pineapple;
 
 
 /*/////////////////////////////////////////////////////////////////////////////
@@ -29,7 +35,7 @@ node* centerList[sizeof(node*) * CENTER_LIST_SIZE];
 //
 /////////////////////////////////////////////////////////////////////////////*/
 
-#define GRAPH_NODE_MAX_CHILDREN 4
+#define GRAPH_NODE_MAX_CHILDREN 10
 
 struct node
 {
@@ -144,10 +150,120 @@ f4x4 frame_to_canonical(node* n){
 //
 /////////////////////////////////////////////////////////////////////////////*/
 
+GLuint load_texture(const char *filename, int w, int h, int depth) {
+    /* Load a texture*/
+    const unsigned int fileSize = w*h*depth;
+    char *tex = (char*) malloc(fileSize);
+    FILE *texFile = fopen(filename,"rb");
+    if(texFile == NULL){
+        printf("Panic: Couldn't open texture file\n");
+        exit(-1);
+    }
+    fread(tex, sizeof(char), fileSize, texFile);
+
+    GLuint tex_id;
+    glGenTextures(1, &tex_id);
+
+    glBindTexture(GL_TEXTURE_2D, tex_id);
+    glTexImage2D(GL_TEXTURE_2D, 0, depth, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, tex);
+
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);	/* Linear Filtering */
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);	/* Linear Filtering */
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);    /* Clamp to border  */
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);    /* Clamp to border  */
+
+    free(tex);
+    return tex_id;
+}
+
 void drawSun()
 {
     glColor3f(1.0f, 1.0f, 0.3f);
     glutSolidSphere(0.6f, 16, 16);
+}
+
+void drawCube(){
+    float l = 0.5f;
+    glBindTexture(GL_TEXTURE_2D, spongebob);
+    glBegin(GL_QUADS);
+    /* Front */
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( l, l,  l);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-l, l,  l);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-l,-l,  l);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f( l,-l,  l);
+
+    /* Back */
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( l, l, -l);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-l, l, -l);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-l,-l, -l);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f( l,-l, -l);
+
+
+    /* Top */
+    /* glColor3f(0.0f, 1.0f, 0.5f); */
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( l, l, -l);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-l, l, -l);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-l, l, l);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f( l, l, l);
+
+    /* Bottom */
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( l,-l, -l);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-l,-l, -l);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-l,-l,  l);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f( l,-l,  l);
+
+
+    /* Left */
+    /* glColor3f(1.0f, 0.0f, 0.5f); */
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(-l, l, -l);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-l, l,  l);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-l,-l,  l);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f(-l,-l, -l);
+
+    /* Right */
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( l, l, -l);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f( l, l,  l);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f( l,-l,  l);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f( l,-l, -l);
+    glEnd();
+}
+
+void drawPyramid(){
+    float l = 1.0f;
+    glBegin(GL_TRIANGLES);
+    glBindTexture(GL_TEXTURE_2D, pineapple);
+    /* Front */
+    glColor3f(1.0f, 1.0f, 0.5f);
+    glVertex3f( 0.0f, l,  0.0f);
+    glVertex3f( l,-l,  l);
+    glVertex3f(-l,-l,  l);
+
+    /* Back */
+    glVertex3f( 0.0f, l,  0.0f);
+    glVertex3f(-l,-l, -l);
+    glVertex3f( l,-l, -l);
+
+    /* Left */
+    glColor3f(0.5f, 0.0f, l);
+    glVertex3f( 0.0f, l,  0.0f);
+    glVertex3f(-l,-l,  l);
+    glVertex3f(-l,-l, -l);
+
+    /* Right */
+    glVertex3f( 0.0f, l,  0.0f);
+    glVertex3f( l,-l, -l);
+    glVertex3f( l,-l,  l);
+
+    /* Bottom */
+    glColor3f(1.0f, 1.0f, 0.5f);
+    glVertex3f(-l,-l,  l);
+    glVertex3f( l,-l,  l);
+    glVertex3f( l,-l, -l);
+    glVertex3f(-l,-l,  l);
+    glVertex3f( l,-l, -l);
+    glVertex3f(-l,-l, -l);
+    glEnd();
 }
 
 void drawEarth()
@@ -163,16 +279,33 @@ void drawNothing()
 void movePlanets()
 {
     f4x4 l, l2;
+    f3 xAxis = f3_make(1.0f, 0.0f, 0.0f);
     f3 yAxis = f3_make(0.0f, 1.0f, 0.0f);
+    f3 zAxis = f3_make(0.0f, 0.0f, 1.0f);
 
     /* Earth */
     l = f4x4_rotate(angle2, yAxis);
     l2 = f4x4_translate(-2.5f, 0.0f, 0.0f);
     earth->transform = f4x4_mul(l, l2);
+
+    /* Pyramid */
+    f4x4 t1, t2, t3, t4;
+    t1 = f4x4_rotate(angle2,xAxis);
+    t2 = f4x4_rotate(angle3,yAxis);
+    t3 = f4x4_mul(t1,t2);
+    t2 = f4x4_rotate(angle1,zAxis);
+    t4 = f4x4_mul(t3,t2);
+    pyramid->transform = t4;
+
+    /* Sun position */
+    l = f4x4_rotate(angle2, yAxis);
+    l2 = f4x4_translate(1.0f, 0.0f, 0.0f);
+    pyramid_p->transform = f4x4_mul(l, l2);
 }
 
 void initSceneGraph()
 {
+    timestamp = glutGet(GLUT_ELAPSED_TIME);
     angle1 = 0.0f;
     angle2 = 0.0f;
     angle3 = 0.0f;
@@ -186,16 +319,24 @@ void initSceneGraph()
     camera->transform = cam;
 
     /* Earth */
-    earth = make_node(drawEarth);
+    earth = make_node(drawCube);
+    
+    /* Pyramid */
+    pyramid = make_node(drawPyramid);
 
-    /* Sun */
-    sun = make_node(drawSun);
-    sun->transform = f4x4_id();
-    add_child(sun, earth);
-    add_child(sun, camera);
+    /* Pyramid position */
+    pyramid_p = make_node(0);
+    add_child(pyramid_p, earth);
+    add_child(pyramid_p, camera);
+    add_child(pyramid_p, pyramid);
 
-    centerList[0] = sun;
-    centerList[1] = earth;
+    origin = make_node(0);
+    origin->transform = f4x4_id();
+    add_child(origin, pyramid_p);
+
+    centerList[0] = origin;
+    centerList[1] = pyramid_p;
+    centerList[2] = earth;
 
     movePlanets();
 }
@@ -204,12 +345,15 @@ void glInit()
 {
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 0.1f);
+
+    spongebob = load_texture("spongebob.raw", 512, 512, 3);
+    pineapple = load_texture("pinapple.raw", 512, 512, 3);
 }
 
 void glCleanUp()
 {
     /* destroy the allocated nodes */
-    destroy_node_rec(sun);
+    destroy_node_rec(origin);
 }
 
 
@@ -239,7 +383,7 @@ void traverseGraph(node* n)
     glPopMatrix();
 }
 
-(* Changes on which object the camera is centered *)
+/* Changes on which object the camera is centered */
 void changeCenter()
 {
     remove_child(camera->parent, camera);
@@ -268,6 +412,7 @@ void keyboard(unsigned char key, int x, int y)
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_TEXTURE_2D);
 
     /* Select the model view */
     glMatrixMode(GL_MODELVIEW);
@@ -277,17 +422,26 @@ void display()
     f4x4 camTrans = frame_to_canonical(camera);
     glLoadMatrixf(camTrans.e);
 
-    traverseGraph(sun);
+    traverseGraph(origin);
 
     glutSwapBuffers();
 }
 
 void idle()
 {
-    /* Move angles a bit */
-    angle1 += 0.6;
-    angle2 += 0.8;
-    angle3 += 0.3;
+    int time = glutGet(GLUT_ELAPSED_TIME);
+    int dt = time - timestamp;
+    if (dt > 10)
+    {
+	float dSec = dt/1000.0f;
+	/* Move angles a bit */
+	angle1 += 90*dSec;
+	angle2 += 120*dSec;
+	angle3 += 180*dSec;	
+	
+	timestamp = time;
+    }
+
     
     /* Do stuff */
     movePlanets();
