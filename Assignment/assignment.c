@@ -2,8 +2,19 @@
 #include "math/f4x4.h"
 #include <stdio.h> /* Include printf for output */
 #include <stdlib.h>
+#include <stdarg.h>
+
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+
+#include <cmath>
+
+#include <GL/glew.h>
 #include <GL/gl.h> /* Include gl commands */
 #include <GL/glut.h> /* Include GLUT for context creation etc. */
+
 
 /* sec:global */
 /* Global storage*/
@@ -27,6 +38,32 @@ node* centerList[sizeof(node*) * CENTER_LIST_SIZE];
 
 GLuint spongebob;
 GLuint pineapple;
+
+/* storage for phong program */
+GLenum pipelineProgram;
+
+GLenum vertexShader;
+GLenum fragmentShader;
+GLint uniformTime;
+GLint uniformTexture;
+
+/* Storage for Lights and Materials */
+unsigned int moveLight = 0;
+
+GLfloat lightAmbient[] =  { 0.0f, 0.0f, 0.0f, 1.0f };
+GLfloat lightDiffuse[] =  { 1.0f, 1.0f, 1.0f, 1.0f };
+GLfloat lightSpecular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+GLfloat lightPos[] = { 0.0, 0.0, 10.0, 1.0 };
+
+GLfloat matAmbient[] =    { 0.0f, 0.0f, 0.0f, 1.0f };
+GLfloat matDiffuse[] =    { 0.0f, 1.0f, 1.0f, 1.0f };
+GLfloat matSpecular[] =   { 1.0f, 1.0f, 1.0f, 1.0f };
+GLfloat matEmission[] =   { 0.0f, 0.0f, 0.0f, 1.0f }; 
+GLfloat matShininess[] =  { 100.0 };
+
+GLfloat matDiffuseBlue[]  =  { 0.8f, 0.6f, 1.0f, 1.0f };
+GLfloat matDiffuseGreen[] =  { 0.6f, 1.0f, 0.8f, 1.0f };
+GLfloat matDiffuseRed[]   =  { 1.0f, 0.8f, 0.6f, 1.0f };
 
 
 /*/////////////////////////////////////////////////////////////////////////////
@@ -141,7 +178,135 @@ f4x4 frame_to_canonical(node* n){
 	return intermediateInverseMatrix;
 }
     
+/*/////////////////////////////////////////////////////////////////////////////
+// sec:shader
+// GLSL helper functions
+//
+/////////////////////////////////////////////////////////////////////////////*/
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define CHECK_FOR_GL_ERROR() CHECK_FOR_GL_ERROR_FUNCTION(__FILE__,TOSTRING(__LINE__))
+
+void exit_with_error(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    fprintf(stderr, "error: ");
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+    exit(EXIT_FAILURE);
+}
+
+void CHECK_FOR_GL_ERROR_FUNCTION(const char* file, const char* line) {
+    GLenum errorCode = glGetError();
+    if (errorCode != GL_NO_ERROR) {
+        const GLubyte* errorString = gluErrorString(errorCode);
+        exit_with_error("[file:%s line:%s] OpenGL Error: %s\n", 
+                        file, line, (char*)errorString);
+    }
+}
+
+char* file_to_string(const char* path) {
+    FILE* fd;
+    long len, r;
+    char* str;
+ 
+    if (!(fd = fopen(path, "r"))) {
+        exit_with_error("Can't open file '%s' for reading\n", path);
+    }
+ 
+    fseek(fd, 0, SEEK_END);
+    len = ftell(fd);
+ 
+    fseek(fd, 0, SEEK_SET);
+    if (!(str = (char*) malloc(len * sizeof(char)))) {
+        exit_with_error("Can't malloc space for '%s'\n", path);
+    }
+ 
+    r = fread(str, sizeof(char), len, fd);
+    str[r - 1] = '\0'; /* Shader sources have to term with null */
+    fclose(fd);
+    return str;
+}
+
+void print_shader_info_log(GLuint shader) {
+    GLint infologLength = 0, charsWritten = 0;
+    GLchar *infoLog;
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infologLength);
+    if (infologLength > 0) {
+        infoLog = (GLchar *)malloc(infologLength);
+        if (infoLog==NULL) {
+            exit_with_error("Could not allocate InfoLog buffer for shader: %u", shader);
+        }
+        glGetShaderInfoLog(shader, infologLength, &charsWritten, infoLog);
+        if (charsWritten > 0)
+            fprintf(stderr, "Shader InfoLog: %u\n%s", shader, infoLog);
+        free(infoLog);
+    }
+}
+
+void print_program_info_log(GLuint program) {
+    GLint infologLength = 0, charsWritten = 0;
+    GLchar* infoLog;
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infologLength);
+    if (infologLength > 0) {
+        infoLog = (GLchar *)malloc(infologLength);
+        if (infoLog==NULL) {
+            exit_with_error("Could not allocate InfoLog buffer for program: %u", program);
+        }
+        glGetProgramInfoLog(program, infologLength, &charsWritten, infoLog);
+        if (charsWritten > 0)
+            fprintf(stderr, "Program InfoLog: %u\n%s", program, infoLog);
+        free(infoLog);
+    }
+}
+
+
+void load_shaders() {
+    GLint compiled;
+
+    /* Create vertex shader */
+    const char *vertexFile = "vPhongVert.glsl";
+    const char* sourceChar = file_to_string(vertexFile);
+    vertexShader = glCreateShaderObjectARB(GL_VERTEX_SHADER);
+    glShaderSourceARB(vertexShader, 1, &sourceChar,NULL);
+    glCompileShaderARB(vertexShader);
+
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &compiled);
+    print_shader_info_log(vertexShader);
+    if (compiled==0) {
+        exit_with_error("Failed compiling shader program: %s\n", vertexFile);
+    }
+
+    /* Create fragment shader */
+    const char *fragmentFile = "vPhongFrag.glsl";
+    const char *sourceFragChar = file_to_string(fragmentFile);
+    fragmentShader = glCreateShaderObjectARB(GL_FRAGMENT_SHADER);
+    glShaderSourceARB(fragmentShader, 1, &sourceFragChar,NULL);
+    glCompileShaderARB(fragmentShader);
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &compiled);
+    print_shader_info_log(fragmentShader);
+    if (compiled==0) {
+        exit_with_error("Failed compiling shader program: %s\n", fragmentFile);
+    }
+
+    /* Create program and link shaders */
+    pipelineProgram = glCreateProgramObjectARB();
+    glAttachObjectARB(pipelineProgram, vertexShader);
+    glAttachObjectARB(pipelineProgram, fragmentShader);
+
+    glLinkProgramARB(pipelineProgram);
+    GLint linked;
+    glGetProgramiv(pipelineProgram, GL_LINK_STATUS, &linked);
+    print_program_info_log(pipelineProgram);
+    if (linked == 0) {
+        exit_with_error("Could not link shader program\n");
+    }
+
+    CHECK_FOR_GL_ERROR();
+
+    printf("Loaded shaders and linked shader program\n");
+}
 
 
 /*/////////////////////////////////////////////////////////////////////////////
@@ -176,6 +341,14 @@ GLuint load_texture(const char *filename, int w, int h, int depth) {
     return tex_id;
 }
 
+void setLightSource(){
+    /* Setup the light source properties */
+    glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpecular);
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+}
+
 void drawSun()
 {
     glColor3f(1.0f, 1.0f, 0.3f);
@@ -185,15 +358,19 @@ void drawSun()
 void drawCube(){
     float l = 0.5f;
     glBindTexture(GL_TEXTURE_2D, spongebob);
+
     glBegin(GL_QUADS);
-    /* Front */
+
     glColor3f(1.0f, 1.0f, 1.0f);
+    /* Front */
+    glNormal3f(0.0f, 0.0f, 1.0f);
     glTexCoord2f(1.0f, 1.0f); glVertex3f( l, l,  l);
     glTexCoord2f(0.0f, 1.0f); glVertex3f(-l, l,  l);
     glTexCoord2f(0.0f, 0.0f); glVertex3f(-l,-l,  l);
     glTexCoord2f(1.0f, 0.0f); glVertex3f( l,-l,  l);
 
     /* Back */
+    glNormal3f(0.0f, 0.0f, -1.0f);
     glTexCoord2f(1.0f, 1.0f); glVertex3f( l, l, -l);
     glTexCoord2f(0.0f, 1.0f); glVertex3f(-l, l, -l);
     glTexCoord2f(0.0f, 0.0f); glVertex3f(-l,-l, -l);
@@ -201,13 +378,14 @@ void drawCube(){
 
 
     /* Top */
-    /* glColor3f(0.0f, 1.0f, 0.5f); */
+    glNormal3f(0.0f, 1.0f, 0.0f);
     glTexCoord2f(1.0f, 1.0f); glVertex3f( l, l, -l);
     glTexCoord2f(0.0f, 1.0f); glVertex3f(-l, l, -l);
     glTexCoord2f(0.0f, 0.0f); glVertex3f(-l, l, l);
     glTexCoord2f(1.0f, 0.0f); glVertex3f( l, l, l);
 
     /* Bottom */
+    glNormal3f(0.0f,-1.0f,0.0f);
     glTexCoord2f(1.0f, 1.0f); glVertex3f( l,-l, -l);
     glTexCoord2f(0.0f, 1.0f); glVertex3f(-l,-l, -l);
     glTexCoord2f(0.0f, 0.0f); glVertex3f(-l,-l,  l);
@@ -215,13 +393,14 @@ void drawCube(){
 
 
     /* Left */
-    /* glColor3f(1.0f, 0.0f, 0.5f); */
+    glNormal3f(-1.0f,0.0f,0.0f);
     glTexCoord2f(1.0f, 1.0f); glVertex3f(-l, l, -l);
     glTexCoord2f(0.0f, 1.0f); glVertex3f(-l, l,  l);
     glTexCoord2f(0.0f, 0.0f); glVertex3f(-l,-l,  l);
     glTexCoord2f(1.0f, 0.0f); glVertex3f(-l,-l, -l);
 
     /* Right */
+    glNormal3f(1.0f,0.0f,0.0f);
     glTexCoord2f(1.0f, 1.0f); glVertex3f( l, l, -l);
     glTexCoord2f(0.0f, 1.0f); glVertex3f( l, l,  l);
     glTexCoord2f(0.0f, 0.0f); glVertex3f( l,-l,  l);
@@ -231,32 +410,38 @@ void drawCube(){
 
 void drawPyramid(){
     float l = 1.0f;
-    glBegin(GL_TRIANGLES);
+    float invsqrt5 = 0.4472135955; /* 1.0f/sqrt(5.0f); */
     glBindTexture(GL_TEXTURE_2D, pineapple);
+    glBegin(GL_TRIANGLES);
+
     /* Front */
     glColor3f(1.0f, 1.0f, 0.5f);
-    glVertex3f( 0.0f, l,  0.0f);
-    glVertex3f( l,-l,  l);
-    glVertex3f(-l,-l,  l);
+    glNormal3f(0.0f, invsqrt5, 2.0f*invsqrt5);
+    glTexCoord2f(0.5f, 0.0f); glVertex3f( 0.0f, l,  0.0f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f( l,-l,  l);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(-l,-l,  l);
 
     /* Back */
-    glVertex3f( 0.0f, l,  0.0f);
-    glVertex3f(-l,-l, -l);
-    glVertex3f( l,-l, -l);
+    glNormal3f(0.0f, invsqrt5, -2.0f*invsqrt5);
+    glTexCoord2f(0.5f, 0.0f); glVertex3f( 0.0f, l,  0.0f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-l,-l, -l);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( l,-l, -l);
 
     /* Left */
-    glColor3f(0.5f, 0.0f, l);
-    glVertex3f( 0.0f, l,  0.0f);
-    glVertex3f(-l,-l,  l);
-    glVertex3f(-l,-l, -l);
+    glNormal3f(-2.0f*invsqrt5, invsqrt5, 0);
+    glTexCoord2f(0.5f, 0.0f); glVertex3f( 0.0f, l,  0.0f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-l,-l,  l); 
+    glTexCoord2f(1.0f, 1.0f); glVertex3f(-l,-l, -l);
 
     /* Right */
-    glVertex3f( 0.0f, l,  0.0f);
-    glVertex3f( l,-l, -l);
-    glVertex3f( l,-l,  l);
+    glNormal3f(2.0f*invsqrt5, invsqrt5, 0);
+    glTexCoord2f(0.5f, 0.0f); glVertex3f( 0.0f, l,  0.0f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f( l,-l, -l);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( l,-l,  l);
 
     /* Bottom */
     glColor3f(1.0f, 1.0f, 0.5f);
+    glNormal3f(0.0f, -1.0f, 0.0f);
     glVertex3f(-l,-l,  l);
     glVertex3f( l,-l,  l);
     glVertex3f( l,-l, -l);
@@ -346,14 +531,21 @@ void glInit()
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 0.1f);
 
+    glEnable(GL_CULL_FACE);
+
     spongebob = load_texture("spongebob.raw", 512, 512, 3);
-    pineapple = load_texture("pinapple.raw", 512, 512, 3);
+    pineapple = load_texture("pineapple.raw", 512, 512, 3);
+
+    load_shaders();
 }
 
 void glCleanUp()
 {
     /* destroy the allocated nodes */
     destroy_node_rec(origin);
+    glDeleteObjectARB(pipelineProgram);
+    glDeleteObjectARB(vertexShader);
+    glDeleteObjectARB(fragmentShader);
 }
 
 
@@ -412,6 +604,9 @@ void keyboard(unsigned char key, int x, int y)
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glUseProgramObjectARB(pipelineProgram);
+
     glEnable(GL_TEXTURE_2D);
 
     /* Select the model view */
@@ -422,13 +617,26 @@ void display()
     f4x4 camTrans = frame_to_canonical(camera);
     glLoadMatrixf(camTrans.e);
 
+    /* glLightfv(GL_LIGHT0, GL_POSITION, camTrans.e); */
+    setLightSource();
+
+    /* Use the same material properties for all objects */
+    glMaterialfv(GL_FRONT, GL_AMBIENT, matAmbient);
+    glMaterialfv(GL_FRONT, GL_SPECULAR, matSpecular);
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, matDiffuse);
+    glMaterialfv(GL_FRONT, GL_EMISSION, matEmission);
+    glMaterialfv(GL_FRONT, GL_SHININESS, matShininess);
+
     traverseGraph(origin);
+
+    glUseProgramObjectARB(0);
 
     glutSwapBuffers();
 }
 
 void idle()
 {
+    /* Attempt to smooth things out a bit */
     int time = glutGet(GLUT_ELAPSED_TIME);
     int dt = time - timestamp;
     if (dt > 10)
@@ -482,6 +690,16 @@ int main(int argc, char**argv)
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);
     glutCreateWindow("IGPIP13 graphics assignment");
+
+    /* Initialize extensions AFTER having an OpenGL context */
+    GLenum err = glewInit();
+    if (GLEW_OK != err)
+    {
+        /* Problem: glewInit failed, something is seriously wrong. */
+        fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+    }
+    fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
+    
     glutKeyboardFunc(keyboard);
     glutDisplayFunc(display);
     glutReshapeFunc(resize);

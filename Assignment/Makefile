@@ -14,7 +14,7 @@ TARGET = $(SOURCE:.c=)
 
 INCLUDES = -I./
 
-LIBS = -L./ -licgip_math -lGL -lGLU -lglut
+LIBS = -L./ -licgip_math -lGLEW -lGL -lGLU -lglut -lpthread -lXext -lm
 
 REC_MAKES = math/
 
