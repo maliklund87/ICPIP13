@@ -27,10 +27,24 @@ Nodes are created with the \texttt{make\_node()} function which takes the addres
 Objects are then rendered by traversing this scene graph, by calling the function \texttt{traverseGraph()} recursively. This function takes a \texttt{node} pointer as a parameter, and for each invocation of the function, the transformation matrix found in the node is pushed on the stack. Then the \texttt{draw()} function for the node is called, and the \texttt{traverseGraph()} function is called with each of the nodes children as the parameter. As the last step of the traversal the nodes transformation matrix is popped off the stack, leaving the stack as it was before the function was called.
 
 
-\section{Extracting transformations from scenegraphs}
+\section{Extracting transformations from scene graphs}
+
+\subsection{The frame-to-canonical matrix}
+Extracting transformations from a scene graph is implemented in the function \texttt{frame\_to\_canonical()}. It takes a pointer to a node as a parameter and traverses 'up' the scene graph until it reaches the root. At each node along the way it computes the inverse of that nodes transformation matrix and multiplies it on an intermediate matrix. This intermediate matrix will contain the complete inverse transformation matrix.
+
+\subsection{The camera}
+The camera is added as a regular node, in the scene graph, but without any pointer to a draw function (i.e. the pointer is 0). The inverse matrix is then acquired using the \textt{frame\_to\_canonical()} function explained above. This matrix is loaded and the scene graph is traversed.
 
 
 \section{Per-pixel lighting}
+
+\subsection{Positioning of light sources}
+I was unable to position any light sources in OpenGL, but it should be fairly straightforward in theory. [\textit{Explain theory!}]
+
+\subsection{Per-fragment lighting}
+Per-fragment lighting is achieved using vertex and fragment shaders in OpenGL. Shaders are implemented using the skeleton from excercise 2, where the vertex and fragment shader-files have been modified accordingly.
+
+\textit{THEORY ABOUT PHONG SHADING}
 
 %-----------------------------------------------------------------------
 %-- PART 2: IMAGE PROCESSING  ------------------------------------------

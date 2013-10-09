@@ -165,14 +165,14 @@ f4x4 frame_to_canonical(node* n){
 
 	while (currentParent != 0){
 	    /* Get the parents transformation matrix */
-		f4x4_invert(currentParent->transform, &inverseParentMatrix);
+	    f4x4_invert(currentParent->transform, &inverseParentMatrix);
 
-		/* Multiply the parents inverse transformation matrix onto the partial reversal matrix */
-		intermediateInverseMatrix = f4x4_mul(intermediateInverseMatrix, inverseParentMatrix);
+	    /* Multiply the parents inverse transformation matrix onto the partial reversal matrix */
+	    intermediateInverseMatrix = f4x4_mul(intermediateInverseMatrix, inverseParentMatrix);
 
-		// Prepare for next loop;
-		currentNode = currentParent;
-		currentParent = currentNode->parent;
+	    // Prepare for next loop;
+	    currentNode = currentParent;
+	    currentParent = currentNode->parent;
 	}
 
 	return intermediateInverseMatrix;
@@ -605,6 +605,7 @@ void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    /* Comment out the glUseProgramObjectARB-lines to view simple texturing */
     glUseProgramObjectARB(pipelineProgram);
 
     glEnable(GL_TEXTURE_2D);

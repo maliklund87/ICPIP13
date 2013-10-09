@@ -34,7 +34,7 @@ GLuint load_texture(const char *filename, int w, int h, int depth) {
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);	/* Linear Filtering */
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);	/* Linear Filtering */
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);    /* Clamp to border  */
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);    /* Clamp to border  */
+    glTexParameterf(GL_TEXTURE_2D, GLT_EXTURE_WRAP_T, GL_CLAMP);    /* Clamp to border  */
 
     free(tex);
     return tex_id;
