@@ -12,7 +12,7 @@
 %-- PART 1: COMPUTER GRAPHICS  -----------------------------------------
 %-----------------------------------------------------------------------
 \part{Computer graphics}
-The computer graphics part is written in C and compiles using make. Most of the code is contained in the file \texttt{assignment.c}, with the exception of the math library given for excercise 1.
+The computer graphics part is written in C and compiles using make. Most of the code is contained in the file \texttt{assignment.c}, with the exception of the math library given for excercise 1. 
 
 The code draws a square and a pyramid. The pyramid rotates around an invisible origin, as well as rotating around its centerpoint. The square rotates around the pyramid, always having the same face towards the pyramid. Pressing the space button will change the center of the camera, from either being centered on the square, the pyramid or the invisible origin.
 
@@ -24,7 +24,9 @@ The id is not used and is a remnant of the scene graph given in the excercise. I
 
 Nodes are created with the \texttt{make\_node()} function which takes the address of a function as a parameter. Children are added to nodes with the \texttt{add\_child()} function and removed with the \texttt{remove\_child()} function. The two functions \texttt{destroy\_node()} and \texttt{destory\_node\_rec()} both delete a node (from memory), where the latter also deletes a nodes children.
 
-Objects are then rendered by traversing this scene graph, by calling the function \texttt{traverseGraph()} recursively. This function takes a \texttt{node} pointer as a parameter, and for each invocation of the function, the transformation matrix found in the node is pushed on the stack. Then the \texttt{draw()} function for the node is called, and the \texttt{traverseGraph()} function is called with each of the nodes children as the parameter. As the last step of the traversal the nodes transformation matrix is popped off the stack, leaving the stack as it was before the function was called.
+Objects are then rendered by traversing this scene graph such that children of a node position themselves \emph{relative} to their parent. The OpenGL API provides a stack that saves transformations as the tree is traversed. As the traversal goes down the tree a transformation matrix is \emph{pushed} on the stack and as the traversal goes up the tree a transformation matrix is \emph{popped} off the stack.
+
+This traversal of the scene graph is done by calling the function \texttt{traverseGraph()}. The function calls itself recursively and takes a \texttt{node} pointer as a parameter, and for each invocation of the function, the transformation matrix found in the node is pushed onto the stack, the node is drawn, the function is recursively called on the nodes children and finally the transformation matrix is popped of the stack.
 
 
 \section{Extracting transformations from scene graphs}
@@ -32,19 +34,41 @@ Objects are then rendered by traversing this scene graph, by calling the functio
 \subsection{The frame-to-canonical matrix}
 Extracting transformations from a scene graph is implemented in the function \texttt{frame\_to\_canonical()}. It takes a pointer to a node as a parameter and traverses 'up' the scene graph until it reaches the root. At each node along the way it computes the inverse of that nodes transformation matrix and multiplies it on an intermediate matrix. This intermediate matrix will contain the complete inverse transformation matrix.
 
+Say that a node is positioned such that its complete transformation matrix looks like
+\[
+  \mathbf{M} = \mathbf{M_0}\mathbf{M_1}\mathbf{M_2}
+\]
+To get the position of the camera in world coordinates the inverse transformation is needed, that is:
+\[
+  \mathbf{M^{-1}} = \mathbf{M_2^{-1}}\mathbf{M_1^{-1}}\mathbf{M_0^{-1}}
+\]
+And this is what the function \texttt{frame\_to\_canonical} computes.
+
 \subsection{The camera}
-The camera is added as a regular node, in the scene graph, but without any pointer to a draw function (i.e. the pointer is 0). The inverse matrix is then acquired using the \textt{frame\_to\_canonical()} function explained above. This matrix is loaded and the scene graph is traversed.
+The camera is added as a regular node, in the scene graph, but without any pointer to a draw function (i.e. the pointer is 0). The inverse matrix, i.e. the position in world space, is then acquired using the \texttt{frame\_to\_canonical()} function explained above. The position of the 'real' OpenGL camera is then set to this matrix, rather than a static matrix, in the \texttt{display()} function.
 
 
 \section{Per-pixel lighting}
 
 \subsection{Positioning of light sources}
-I was unable to position any light sources in OpenGL, but it should be fairly straightforward in theory. [\textit{Explain theory!}]
+I was unable to selectively position any light sources using OpenGL, but it should be fairly straightforward in theory. You can create one or more nodes representing one or more lightsources in the same manner as the camera from the previous section and use the function \texttt{frame\_to\_canonical()} to get the position of a light source in world space. These positions of the light sources would then need to be passed on to the shaders and retrieved in a similar fashion as it is done below. How to 'pass on' the positions eluded me though.
 
 \subsection{Per-fragment lighting}
-Per-fragment lighting is achieved using vertex and fragment shaders in OpenGL. Shaders are implemented using the skeleton from excercise 2, where the vertex and fragment shader-files have been modified accordingly.
+Per-fragment lighting is achieved using vertex and fragment shaders in OpenGL. Shaders are implemented using the skeleton from excercise 2, where the vertex and fragment shader-files have been modified appropriately.
 
-\textit{THEORY ABOUT PHONG SHADING}
+The shading model used to implement per-fragment lighting is Phong shading using equations 10.5 and 10.6
+\[
+  c = c_l max(0, \mathbf{e} \cdot \mathbf{r})^p
+\]\[
+  \mathbf{r} = -\mathbf{l} + \mathbf{e}(\mathbf{l} \cdot \mathbf{n})\mathbf{n}
+\]
+where $c$ is the final color of the pixel, $c_l$ is the specular color of the surface, $\mathbf{e}$ is the unit vector towards the eye, $\mathbf{n}$ is the normal unit vector of the surface and $\mathbf{l}$ is the unit vector towards the light source. 
+
+In the vertex shader the surface normal \texttt{n} and the vertex position \texttt{v} are transformed into eye coordinates and passed on to the fragment shader. In addition the normal vector is normalized.
+
+In the fragment shader the direction of the light, as seen from the surface, is calculated as $\mathbf{l} = \mathbf{l_e} - \mathbf{v_e}$, where $\mathbf{l_e}$ is the position of the light and $\mathbf{v_e}$ is the position of the vertex, both in eye coordinates. The direction of the eye is just the direction of the vertex reversed, i.e. $\mathbf{e} = -\mathbf{v_e}$. These vectors, as well as $\mathbf{r}$, need to be normalized before using them. With these two vectors $\mathbf{r}$ is acquired using equation 10.6 and the specular shading is calculated using equation 10.5. The specular color ($c_l$ in equation 10.5) is given by the variable \texttt{gl\_FrontMaterial.specular} and the power $p$ by \texttt{gl\_FrontMaterial.shininess}.
+
+Prior to adding the Phong shading there has also been added some ambient shading and some Lambertian shading (given by $max(0, \mathbf{l} \cdot \mathbf{n})$).
 
 %-----------------------------------------------------------------------
 %-- PART 2: IMAGE PROCESSING  ------------------------------------------

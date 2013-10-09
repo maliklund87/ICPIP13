@@ -175,6 +175,8 @@ f4x4 frame_to_canonical(node* n){
 	    currentParent = currentNode->parent;
 	}
 
+	
+
 	return intermediateInverseMatrix;
 }
     
